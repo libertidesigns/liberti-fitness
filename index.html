@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>LIBERTI · Fitness</title>
+<link rel="manifest" href="manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="LIBERTI Fitness">
+<meta name="theme-color" content="#060606">
+<link rel="apple-touch-icon" href="icon-512.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Teko:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:#060606;font-family:'Montserrat',sans-serif;color:#ede8dc;overflow-x:hidden}
+input,textarea,select{-webkit-appearance:none;font-family:'Montserrat',sans-serif}
+input::placeholder,textarea::placeholder{color:#2a2520;opacity:1}
+input:focus,textarea:focus,select:focus{border-color:#5a1111!important;outline:none}
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-thumb{background:#3a1010;border-radius:2px}
+select option{background:#111}
+input[type=number]::-webkit-inner-spin-button{opacity:.25}
+input[type=checkbox]{accent-color:#8B1A1A;width:16px;height:16px;cursor:pointer;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@keyframes scaleIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
+@keyframes pulse{0%,100%{opacity:.2}50%{opacity:1}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+@keyframes revealLogo{0%{opacity:0;letter-spacing:0.6em;filter:blur(8px)}60%{opacity:1;filter:blur(0)}100%{opacity:1;letter-spacing:0.26em;filter:blur(0)}}
+@keyframes lineGrow{from{transform:scaleX(0);opacity:0}to{transform:scaleX(1);opacity:1}}
+@keyframes fitnessFade{from{opacity:0;letter-spacing:0.8em}to{opacity:1;letter-spacing:0.44em}}
+@keyframes glowPulse{0%,100%{box-shadow:0 0 0px rgba(139,26,26,0)}50%{box-shadow:0 0 60px rgba(139,26,26,0.18)}}
+.pin-numpad{display:block}
+@media(hover:hover)and(pointer:fine){.pin-numpad{display:none}}
+@media(max-width:900px){.main-pad{padding:20px 16px 110px!important}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+/*
+==============================================
+  LIBERTI FITNESS — Nastavení
+==============================================
+  1. Nastav svůj Google Apps Script URL níže
+  2. Změň PIN na svůj vlastní (libovolná délka)
+  Instrukce: viz SETUP.md
+==============================================
+*/
+var API_URL="https://script.google.com/macros/s/AKfycbzCOYrM34sfzPhK9Inkjwd8HRdbfygVFbEA1qQtQ1vIzte8FMdbBnXVBm3xetB61fiU/exec";
+var CORRECT_PIN="2183971";
+(function(){if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(function(){});})();
+function jsonpCall(url,params){
+  return new Promise(function(resolve,reject){
+    var cbName='jcb_'+Math.random().toString(36).slice(2);
+    var sc;
+    var timer=setTimeout(function(){delete window[cbName];if(sc&&sc.parentNode)sc.parentNode.removeChild(sc);reject(new Error('Timeout'));},22000);
+    window[cbName]=function(data){clearTimeout(timer);delete window[cbName];if(sc&&sc.parentNode)sc.parentNode.removeChild(sc);if(data&&data.ok===false)reject(new Error(data.error||'API chyba'));else resolve(data);};
+    var q=Object.keys(params).map(function(k){return encodeURIComponent(k)+'='+params[k];}).join('&');
+    sc=document.createElement('script');
+    sc.src=url+'?'+q+'&callback='+cbName;
+    sc.onerror=function(){clearTimeout(timer);delete window[cbName];if(sc&&sc.parentNode)sc.parentNode.removeChild(sc);reject(new Error('Chyba.'));};
+    document.head.appendChild(sc);
+  });
+}
+function apiRead(type){
+  return jsonpCall(API_URL,{action:'read',type:type,t:Date.now()})
+    .then(function(d){return Array.isArray(d&&d.data)?d.data:[];})
+    .catch(function(){return [];});
+}
+function apiWrite(type,data){var enc=encodeURIComponent(JSON.stringify(data));return jsonpCall(API_URL,{action:'write',type:type,data:enc,t:Date.now()});}
+</script>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback,useMemo}=React;
+
+/* ── Colors & Typography ─────────────────────────────────────────── */
+const C={bg:"#060606",s0:"#0a0a0a",s1:"#0f0f0f",s2:"#141414",border:"#1e1e1e",bHi:"#252525",ivory:"#ede8dc",dim:"#5c5650",hi:"#9a9088",merlot:"#8B1A1A",mDark:"#2a0808",mBorder:"#4a1010",green:"#3aaa5a",greenDark:"#061510",blue:"#4a90d0"};
+const T={t:{fontFamily:"'Teko',sans-serif"},m:{fontFamily:"'Montserrat',sans-serif"}};
+const uid=()=>Math.random().toString(36).slice(2,10);
+const toDay=()=>new Date().toISOString().slice(0,10);
+const fmtDate=d=>{if(!d)return"—";try{const[y,m,dd]=d.split("-");return`${parseInt(dd)}. ${parseInt(m)}. ${y}`;}catch(e){return d;}};
+const today=toDay();
+
+/* ── Training Plans Data ─────────────────────────────────────────── */
+const PLANS=[
+  {
+    id:"beginner",name:"Začátečník",desc:"3 dny týdně · Celé tělo",weeks:8,color:"#3aaa5a",
+    days:[
+      {name:"Push — Tlaky",exercises:[
+        {name:"Kliky",sets:3,reps:"8–12",rest:90},{name:"Dips",sets:3,reps:"6–10",rest:90},
+        {name:"Pike Push-up",sets:3,reps:"8–10",rest:90},{name:"Tricep Push-up",sets:2,reps:"10–15",rest:60},
+      ]},
+      {name:"Pull — Tahy",exercises:[
+        {name:"Shyby",sets:3,reps:"5–8",rest:120},{name:"Australské shyby",sets:3,reps:"8–12",rest:90},
+        {name:"Bicepsy",sets:3,reps:"10–12",rest:60},{name:"Facepull",sets:3,reps:"15",rest:60},
+      ]},
+      {name:"Legs & Core",exercises:[
+        {name:"Dřepy",sets:4,reps:"12–15",rest:90},{name:"Výpady",sets:3,reps:"10/noha",rest:60},
+        {name:"Lýtka",sets:3,reps:"20",rest:45},{name:"Plank",sets:3,reps:"45s",rest:45},
+        {name:"Leg Raises",sets:3,reps:"12–15",rest:45},
+      ]},
+    ]
+  },
+  {
+    id:"kali",name:"Kalistenik",desc:"4 dny týdně · Push / Pull",weeks:12,color:"#4a90d0",
+    days:[
+      {name:"Push A",exercises:[
+        {name:"Diamantové kliky",sets:4,reps:"6–10",rest:90},{name:"Pike Push-up",sets:4,reps:"8–12",rest:90},
+        {name:"Dips",sets:3,reps:"8–12",rest:90},{name:"Planche Push-up",sets:3,reps:"5–8",rest:120},
+      ]},
+      {name:"Pull A",exercises:[
+        {name:"Shyby úzkým",sets:4,reps:"6–10",rest:120},{name:"Archer Pull-up",sets:3,reps:"4–6/strana",rest:120},
+        {name:"Australské shyby",sets:4,reps:"10–15",rest:90},{name:"Přítahy",sets:3,reps:"8–12",rest:90},
+      ]},
+      {name:"Push B",exercises:[
+        {name:"Kliky s elevací",sets:4,reps:"8–12",rest:90},{name:"Explosive Push-up",sets:3,reps:"5–8",rest:120},
+        {name:"Dips (wide)",sets:3,reps:"6–10",rest:90},{name:"Pike Press",sets:3,reps:"8",rest:90},
+      ]},
+      {name:"Pull B + Core",exercises:[
+        {name:"Shyby nadhmatem",sets:4,reps:"6–10",rest:120},{name:"L-Sit Pull-up",sets:3,reps:"4–6",rest:120},
+        {name:"Front Lever tuck",sets:4,reps:"10–20s",rest:90},{name:"Hanging Leg Raise",sets:4,reps:"12–15",rest:60},
+        {name:"Dragon Flag",sets:3,reps:"5–8",rest:90},
+      ]},
+    ]
+  },
+  {
+    id:"ppl",name:"Push / Pull / Legs",desc:"6 dní týdně · Nabírač",weeks:16,color:"#c084fc",
+    days:[
+      {name:"Push",exercises:[
+        {name:"Bench Press",sets:4,reps:"6–8",rest:120},{name:"Incline Press",sets:3,reps:"8–10",rest:90},
+        {name:"Overhead Press",sets:4,reps:"6–8",rest:120},{name:"Dips",sets:3,reps:"8–12",rest:90},
+        {name:"Lateral Raises",sets:4,reps:"12–15",rest:60},{name:"Tricep Pushdown",sets:3,reps:"12–15",rest:60},
+      ]},
+      {name:"Pull",exercises:[
+        {name:"Shyby",sets:4,reps:"6–10",rest:120},{name:"Bent-over Row",sets:4,reps:"6–8",rest:120},
+        {name:"Cable Row",sets:3,reps:"10–12",rest:90},{name:"Facepull",sets:3,reps:"15",rest:60},
+        {name:"Bicep Curl",sets:4,reps:"10–12",rest:60},{name:"Hammer Curl",sets:3,reps:"12",rest:60},
+      ]},
+      {name:"Legs",exercises:[
+        {name:"Squat",sets:4,reps:"6–8",rest:150},{name:"Romanian Deadlift",sets:3,reps:"8–10",rest:120},
+        {name:"Leg Press",sets:4,reps:"10–12",rest:90},{name:"Leg Curl",sets:3,reps:"12–15",rest:90},
+        {name:"Lýtka",sets:4,reps:"15–20",rest:60},
+      ]},
+      {name:"Push",exercises:[
+        {name:"Bench Press",sets:4,reps:"8–10",rest:90},{name:"Incline DB Press",sets:3,reps:"10–12",rest:90},
+        {name:"Shoulder Press",sets:3,reps:"10–12",rest:90},{name:"Cable Fly",sets:3,reps:"12–15",rest:60},
+        {name:"Tricep Extension",sets:4,reps:"12–15",rest:60},
+      ]},
+      {name:"Pull",exercises:[
+        {name:"Deadlift",sets:3,reps:"5",rest:180},{name:"Shyby",sets:4,reps:"8–10",rest:120},
+        {name:"T-Bar Row",sets:3,reps:"10–12",rest:90},{name:"Pullover",sets:3,reps:"12",rest:60},
+        {name:"Incline Curl",sets:3,reps:"12",rest:60},
+      ]},
+      {name:"Legs",exercises:[
+        {name:"Front Squat",sets:4,reps:"8–10",rest:120},{name:"Leg Press",sets:4,reps:"12–15",rest:90},
+        {name:"Walking Lunges",sets:3,reps:"10/noha",rest:90},{name:"Nordic Curl",sets:3,reps:"6–8",rest:120},
+        {name:"Lýtka stojmo",sets:4,reps:"20",rest:45},
+      ]},
+    ]
+  },
+];
+
+const QUOTES=[
+  "Každý trénink tě přibližuje o krok k lepšímu tělu.",
+  "Bolest je dočasná. Hrdost je věčná.",
+  "Jsi silnější, než si myslíš.",
+  "Výsledky přicházejí po čase. Nevzdávej to.",
+  "Dnes je perfektní den stát se silnějším.",
+  "Tělo dosáhne toho, co si mysl dokáže představit.",
+  "Nepočítej dny — zařiď, aby dny byly počítatelné.",
+  "Úsilí dnešního dne tvoří tělo zítřka.",
+  "Jeden trénink navíc = jeden krok před ostatními.",
+  "Konzistence porazí motivaci každý den.",
+];
+
+const DEF_SETTINGS={name:"Sportovec",goalWeight:"",startWeight:"",calGoal:2500,activePlan:"beginner"};
+
+/* ── Atoms ─────────────────────────────────────────────────────── */
+function Lbl({c,s={}}){return <div style={{...T.m,fontSize:9,letterSpacing:"0.18em",textTransform:"uppercase",color:C.dim,marginBottom:5,...s}}>{c}</div>;}
+function Spin({sz=18}){return <div style={{width:sz,height:sz,border:`2px solid ${C.border}`,borderTop:`2px solid ${C.merlot}`,borderRadius:"50%",animation:"spin .8s linear infinite",flexShrink:0}}/>;}
+function Card({children,sx={}}){return <div style={{background:C.s1,border:`1px solid ${C.border}`,borderRadius:4,...sx}}>{children}</div>;}
+function SH({c,sub}){return(
+  <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+    <span style={{...T.t,fontSize:17,fontWeight:600,letterSpacing:"0.16em",color:C.ivory,textTransform:"uppercase"}}>{c}</span>
+    {sub&&<span style={{...T.m,fontSize:9,color:C.dim,letterSpacing:"0.12em",textTransform:"uppercase"}}>{sub}</span>}
+    <div style={{flex:1,height:1,background:C.border}}/>
+  </div>
+);}
+function Btn({ch,onClick,v="p",sx={},dis=false}){
+  const vs={
+    p:{bg:C.merlot,c:C.ivory,b:"none"},
+    g:{bg:"transparent",c:C.hi,b:`1px solid ${C.bHi}`},
+    d:{bg:"transparent",c:"#c03030",b:"1px solid #3a0e0e"},
+    gr:{bg:C.green,c:"#fff",b:"none"},
+  };
+  const st=vs[v]||vs.p;
+  return <button onClick={onClick} disabled={dis} style={{background:st.bg,color:st.c,border:st.b,borderRadius:4,padding:"11px 18px",cursor:dis?"not-allowed":"pointer",...T.m,fontSize:10,fontWeight:500,letterSpacing:"0.14em",textTransform:"uppercase",opacity:dis?.4:1,touchAction:"manipulation",transition:"opacity .15s",...sx}}>{ch}</button>;
+}
+function Inp({lbl,val,onChange,ph,type="text",ml,rows=3,opts,sx={}}){
+  const base={width:"100%",background:C.s2,border:`1px solid ${C.border}`,borderRadius:3,padding:"11px 12px",color:C.ivory,...T.m,fontSize:13,resize:"vertical",boxSizing:"border-box",transition:"border-color .15s",...sx};
+  const strVal=val===null||val===undefined?"":String(val);
+  return(
+    <div>
+      {lbl&&<Lbl c={lbl}/>}
+      {ml?<textarea value={strVal} onChange={e=>onChange(e.target.value)} placeholder={ph} rows={rows} style={base}/>
+      :opts?<select value={strVal} onChange={e=>onChange(e.target.value)} style={{...base,cursor:"pointer",appearance:"none"}}>
+        {opts.map(o=><option key={o.v??o} value={o.v??o}>{o.l??o}</option>)}
+      </select>
+      :<input type={type} value={strVal} onChange={e=>onChange(e.target.value)} placeholder={ph} style={base}/>}
+    </div>
+  );
+}
+function Bar({pct,color=C.merlot,h=4}){
+  return(
+    <div style={{width:"100%",background:C.s2,borderRadius:2,height:h,overflow:"hidden"}}>
+      <div style={{width:`${Math.min(100,Math.max(0,pct||0))}%`,background:color,height:"100%",borderRadius:2,transition:"width .4s ease"}}/>
+    </div>
+  );
+}
+
+/* ── Confirm Modal ──────────────────────────────────────────────── */
+function ConfirmModal({msg,onYes,onNo}){
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.78)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)",animation:"fadeIn .18s ease"}}>
+      <div style={{background:C.s1,border:`1px solid ${C.mBorder}`,borderRadius:6,padding:"28px 32px",maxWidth:360,width:"90%",animation:"scaleIn .2s cubic-bezier(.22,1,.36,1)"}}>
+        <div style={{...T.m,fontSize:13,color:C.ivory,lineHeight:1.7,marginBottom:24,whiteSpace:"pre-line"}}>{msg}</div>
+        <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+          <Btn ch="Zrušit" onClick={onNo} v="g"/>
+          <Btn ch="Potvrdit" onClick={onYes}/>
+        </div>
+      </div>
+    </div>
+  );
+}
+function useConfirm(){
+  const [state,setState]=useState(null);
+  const confirm=(msg)=>new Promise(resolve=>{setState({msg,resolve});});
+  const Modal=state?<ConfirmModal msg={state.msg} onYes={()=>{state.resolve(true);setState(null);}} onNo={()=>{state.resolve(false);setState(null);}}/>:null;
+  return{confirm,Modal};
+}
+
+/* ── Intro Sound ────────────────────────────────────────────────── */
+function playIntroSound(){
+  try{
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    if(ctx.state==="suspended")ctx.resume();
+    const now=ctx.currentTime;
+    const mk=(type,freq,start,end,gainPeak,gainStart,gainEnd)=>{
+      const o=ctx.createOscillator(),g=ctx.createGain();
+      o.type=type;o.frequency.setValueAtTime(freq,now+start);
+      g.gain.setValueAtTime(gainStart||0,now+start);
+      g.gain.linearRampToValueAtTime(gainPeak,now+start+0.15);
+      g.gain.linearRampToValueAtTime(gainEnd||0,now+end);
+      o.connect(g);g.connect(ctx.destination);
+      o.start(now+start);o.stop(now+end+0.05);
+    };
+    mk("sine",42,0,2.8,0.18,0,0);
+    mk("triangle",110,0.1,2.5,0.06,0,0);
+    mk("sine",880,0.75,1.9,0.035,0,0);
+    mk("sine",528,2.55,3.8,0.08,0,0.001);
+  }catch(e){}
+}
+
+/* ── PIN Login ──────────────────────────────────────────────────── */
+function PinLogin({onSuccess}){
+  const [pin,setPin]=useState("");
+  const [err,setErr]=useState(false);
+  const [shake,setShake]=useState(false);
+  const [phase,setPhase]=useState("intro");
+  const played=useRef(false);
+  const triggerSound=useCallback(()=>{if(played.current)return;played.current=true;playIntroSound();},[]);
+
+  useEffect(()=>{
+    if(localStorage.getItem("liberti_fit_auth")==="1"){onSuccess();return;}
+    const sa=setTimeout(()=>triggerSound(),300);
+    const t=setTimeout(()=>setPhase("pin"),2600);
+    return()=>{clearTimeout(t);clearTimeout(sa);};
+  },[]);
+
+  const check=useCallback((val)=>{
+    if(val.length===CORRECT_PIN.length){
+      if(val===CORRECT_PIN){localStorage.setItem("liberti_fit_auth","1");onSuccess();}
+      else{setShake(true);setErr(true);setTimeout(()=>{setShake(false);setErr(false);setPin("");},650);}
+    }
+  },[onSuccess]);
+
+  const addDigit=useCallback((d)=>{
+    triggerSound();
+    setPin(prev=>{if(prev.length>=CORRECT_PIN.length)return prev;const next=prev+d;check(next);return next;});
+  },[check,triggerSound]);
+  const delDigit=useCallback(()=>setPin(p=>p.slice(0,-1)),[]);
+
+  useEffect(()=>{
+    const h=e=>{if(/^\d$/.test(e.key))addDigit(e.key);else if(e.key==="Backspace")delDigit();};
+    window.addEventListener("keydown",h);
+    return()=>window.removeEventListener("keydown",h);
+  },[addDigit,delDigit]);
+
+  const digits=CORRECT_PIN.length;
+  const isIntro=phase==="intro";
+
+  return(
+    <div onTouchStart={triggerSound} onClick={triggerSound}
+      style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",position:"relative",overflow:"hidden",userSelect:"none",animation:isIntro?"glowPulse 2.6s ease":"none"}}>
+      <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,0.6) 100%)",pointerEvents:"none"}}/>
+
+      {/* Logo */}
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",transition:"transform 0.9s cubic-bezier(.22,1,.36,1), margin 0.9s cubic-bezier(.22,1,.36,1)",transform:isIntro?"translateY(0)":"translateY(-32px)",marginBottom:isIntro?0:44}}>
+        <div style={{...T.t,fontWeight:300,fontSize:isIntro?"clamp(64px,12vw,96px)":"52px",letterSpacing:"0.26em",textIndent:"0.26em",color:C.ivory,lineHeight:1,textAlign:"center",animation:"revealLogo 1.1s cubic-bezier(.22,1,.36,1) both",transition:"font-size 0.9s cubic-bezier(.22,1,.36,1)"}}>LIBERTI</div>
+        <div style={{display:"flex",alignItems:"center",width:isIntro?"clamp(240px,40vw,360px)":"220px",gap:14,marginTop:isIntro?18:12,transition:"width 0.9s cubic-bezier(.22,1,.36,1), margin 0.9s cubic-bezier(.22,1,.36,1)",overflow:"hidden"}}>
+          <div style={{height:1,flex:1,background:"rgba(139,26,26,.7)",transformOrigin:"left",animation:"lineGrow .8s cubic-bezier(.22,1,.36,1) .7s both"}}/>
+          <div style={{...T.m,fontSize:isIntro?9:8,letterSpacing:"0.44em",textTransform:"uppercase",color:C.merlot,animation:"fitnessFade .6s cubic-bezier(.22,1,.36,1) 1s both",transition:"font-size 0.9s ease",flexShrink:0}}>FITNESS</div>
+          <div style={{height:1,flex:1,background:"rgba(139,26,26,.7)",transformOrigin:"right",animation:"lineGrow .8s cubic-bezier(.22,1,.36,1) .7s both"}}/>
+        </div>
+      </div>
+
+      {/* PIN */}
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:20,opacity:isIntro?0:1,transform:isIntro?"translateY(12px)":"translateY(0)",transition:"opacity 0.7s ease 0.1s, transform 0.7s cubic-bezier(.22,1,.36,1) 0.1s",pointerEvents:isIntro?"none":"auto"}}>
+        <div style={{...T.m,fontSize:8.5,letterSpacing:"0.32em",textTransform:"uppercase",color:C.hi}}>Zadej PIN</div>
+        <div style={{display:"flex",gap:14,animation:shake?"shake .5s ease":"none"}}>
+          {Array.from({length:digits}).map((_,i)=>(
+            <div key={i} style={{width:13,height:13,borderRadius:"50%",background:err?"#5a0a0a":i<pin.length?C.merlot:C.s2,border:`1px solid ${err?"#8B1A1A":i<pin.length?C.merlot:C.border}`,transition:"all .15s cubic-bezier(.22,1,.36,1)",boxShadow:i<pin.length&&!err?"0 0 14px rgba(139,26,26,.6)":"none",animation:i===pin.length&&!err?"pulse 1.4s ease infinite":"none"}}/>
+          ))}
+        </div>
+        {err&&<div style={{...T.m,fontSize:9,letterSpacing:"0.22em",color:"#c03030",textTransform:"uppercase",animation:"fadeIn .2s ease"}}>Nesprávný PIN</div>}
+
+        <div style={{marginTop:16}} className="pin-numpad">
+          {[[1,2,3],[4,5,6],[7,8,9],["","0","⌫"]].map((row,ri)=>(
+            <div key={ri} style={{display:"flex",gap:12,justifyContent:"center",marginBottom:10}}>
+              {row.map((d,di)=>(
+                <button key={di} onClick={e=>{e.stopPropagation();if(d==="⌫")delDigit();else if(d!=="")addDigit(String(d));}}
+                  disabled={d===""}
+                  style={{width:64,height:64,borderRadius:"50%",border:`1px solid ${d===""?"transparent":C.border}`,background:d===""?"transparent":C.s2,cursor:d===""?"default":"pointer",color:C.ivory,...T.t,fontWeight:300,fontSize:26,letterSpacing:"0.05em",display:"flex",alignItems:"center",justifyContent:"center",WebkitTapHighlightColor:"transparent",transition:"background .12s,border-color .12s",touchAction:"manipulation"}}
+                  onTouchStart={e=>{if(d!=="")e.currentTarget.style.background=C.mBorder;}}
+                  onTouchEnd={e=>{e.currentTarget.style.background=d===""?"transparent":C.s2;}}
+                >{d}</button>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{position:"absolute",bottom:28,textAlign:"center",opacity:isIntro?0:0.6,transition:"opacity 1s ease 0.4s"}}>
+        <div style={{...T.m,fontSize:7.5,letterSpacing:"0.22em",color:C.dim,textTransform:"uppercase"}}>Liberti Fitness · 2026</div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Rest Timer ─────────────────────────────────────────────────── */
+function RestTimer({seconds,onDone}){
+  const [left,setLeft]=useState(seconds);
+  useEffect(()=>{
+    if(left<=0){onDone();return;}
+    const t=setTimeout(()=>setLeft(l=>l-1),1000);
+    return()=>clearTimeout(t);
+  },[left]);
+  const pct=(seconds-left)/seconds;
+  const r=38;const circ=2*Math.PI*r;
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(6px)"}}>
+      <div style={{background:C.s1,border:`1px solid ${C.mBorder}`,borderRadius:8,padding:"32px 40px",textAlign:"center",animation:"scaleIn .2s ease",minWidth:200}}>
+        <div style={{...T.m,fontSize:9,letterSpacing:"0.2em",color:C.dim,textTransform:"uppercase",marginBottom:20}}>Odpočinek</div>
+        <svg width={100} height={100} viewBox="0 0 100 100" style={{transform:"rotate(-90deg)"}}>
+          <circle cx={50} cy={50} r={r} fill="none" stroke={C.border} strokeWidth={4}/>
+          <circle cx={50} cy={50} r={r} fill="none" stroke={C.merlot} strokeWidth={4}
+            strokeDasharray={circ} strokeDashoffset={circ*(1-pct)} style={{transition:"stroke-dashoffset .9s linear"}}/>
+        </svg>
+        <div style={{...T.t,fontSize:52,fontWeight:300,color:C.ivory,marginTop:4,lineHeight:1}}>{left}</div>
+        <div style={{...T.m,fontSize:9,color:C.dim,marginBottom:16}}>sekund</div>
+        <Btn ch="Přeskočit" onClick={onDone} v="g" sx={{fontSize:9,padding:"8px 20px"}}/>
+      </div>
+    </div>
+  );
+}
+
+/* ── Home Tab ───────────────────────────────────────────────────── */
+function HomeTab({workouts,progress,settings,onGoTo}){
+  const quote=useMemo(()=>QUOTES[Math.floor(Math.random()*QUOTES.length)],[]);
+  const plan=PLANS.find(p=>p.id===settings.activePlan)||PLANS[0];
+  const dayIndex=workouts.filter(w=>w.planId===plan.id).length%plan.days.length;
+  const todayDay=plan.days[dayIndex];
+  const todayDone=workouts.some(w=>w.date===today);
+  const lastWeight=progress.length?progress[progress.length-1].weight:"—";
+
+  const streak=useMemo(()=>{
+    if(!workouts.length)return 0;
+    const dates=[...new Set(workouts.map(w=>w.date))].sort().reverse();
+    let s=0;let cur=new Date(today);
+    for(const d of dates){
+      const diff=Math.round((cur-new Date(d))/(1000*60*60*24));
+      if(diff<=1){s++;cur=new Date(d);}else break;
+    }
+    return s;
+  },[workouts]);
+
+  const weeklyCount=useMemo(()=>{
+    const weekAgo=new Date();weekAgo.setDate(weekAgo.getDate()-7);
+    return workouts.filter(w=>new Date(w.date)>=weekAgo).length;
+  },[workouts]);
+
+  return(
+    <div style={{padding:"24px 20px 110px",animation:"fadeIn .3s ease"}}>
+      {/* Greeting */}
+      <div style={{marginBottom:20}}>
+        <div style={{...T.t,fontSize:30,fontWeight:300,letterSpacing:"0.1em",color:C.ivory,textTransform:"uppercase",lineHeight:1}}>Ahoj, {settings.name}</div>
+        <div style={{...T.m,fontSize:10,color:C.dim,marginTop:4,letterSpacing:"0.08em"}}>{fmtDate(today)}</div>
+      </div>
+
+      {/* Quote */}
+      <div style={{background:C.s1,border:`1px solid ${C.mBorder}`,borderRadius:4,padding:"14px 18px",marginBottom:20,borderLeft:`3px solid ${C.merlot}`}}>
+        <div style={{...T.m,fontSize:12,color:C.hi,lineHeight:1.7,fontStyle:"italic"}}>"{quote}"</div>
+      </div>
+
+      {/* Stats */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:20}}>
+        {[{label:"Série",val:streak,unit:"dní"},{label:"Tento týden",val:weeklyCount,unit:"tréninků"},{label:"Váha",val:lastWeight,unit:"kg"}].map(s=>(
+          <Card key={s.label} sx={{padding:"14px 10px",textAlign:"center"}}>
+            <div style={{...T.t,fontSize:30,fontWeight:500,color:C.merlot,lineHeight:1}}>{s.val}</div>
+            <div style={{...T.m,fontSize:8,color:C.dim,letterSpacing:"0.1em",textTransform:"uppercase",marginTop:2}}>{s.unit}</div>
+            <div style={{...T.m,fontSize:7.5,color:C.dim,letterSpacing:"0.12em",textTransform:"uppercase",marginTop:4,opacity:.7}}>{s.label}</div>
+          </Card>
+        ))}
+      </div>
+
+      {/* Today's workout card */}
+      <Card sx={{padding:"20px",marginBottom:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+          <div>
+            <Lbl c="Dnešní trénink"/>
+            <div style={{...T.t,fontSize:22,fontWeight:500,color:C.ivory,letterSpacing:"0.1em",textTransform:"uppercase",lineHeight:1}}>{todayDay.name}</div>
+            <div style={{...T.m,fontSize:10,color:C.dim,marginTop:4}}>{plan.name} · Den {dayIndex+1} / {plan.days.length}</div>
+          </div>
+          {todayDone&&<div style={{...T.m,fontSize:8,color:C.green,letterSpacing:"0.1em",textTransform:"uppercase",background:C.greenDark,border:`1px solid ${C.green}44`,borderRadius:3,padding:"5px 10px",flexShrink:0}}>✓ Hotovo</div>}
+        </div>
+        <div style={{marginBottom:16}}>
+          {todayDay.exercises.slice(0,4).map((ex,i)=>(
+            <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:`1px solid ${C.border}`}}>
+              <div style={{...T.m,fontSize:12,color:C.hi}}>{ex.name}</div>
+              <div style={{...T.m,fontSize:11,color:C.dim}}>{ex.sets}×{ex.reps}</div>
+            </div>
+          ))}
+          {todayDay.exercises.length>4&&<div style={{...T.m,fontSize:10,color:C.dim,marginTop:8}}>+{todayDay.exercises.length-4} dalších cvičení</div>}
+        </div>
+        <Btn ch={todayDone?"Trénovat znovu":"Začít trénink"} onClick={()=>onGoTo("workout")} v={todayDone?"g":"p"} sx={{width:"100%",padding:"13px"}}/>
+      </Card>
+
+      {/* Goal progress */}
+      {settings.goalWeight&&settings.startWeight&&(()=>{
+        const start=parseFloat(settings.startWeight)||0;
+        const goal=parseFloat(settings.goalWeight)||0;
+        const curr=parseFloat(lastWeight)||start;
+        if(!start||!goal)return null;
+        const total=Math.abs(goal-start);
+        const done=Math.abs(curr-start);
+        const pct=total>0?Math.min(100,(done/total)*100):0;
+        return(
+          <Card sx={{padding:"18px 20px",marginBottom:20}}>
+            <Lbl c="Cílová váha"/>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:10}}>
+              <div style={{...T.t,fontSize:24,color:C.ivory}}>{curr} kg</div>
+              <div style={{...T.m,fontSize:10,color:C.green}}>Cíl: {goal} kg</div>
+            </div>
+            <Bar pct={pct} color={C.merlot} h={6}/>
+            <div style={{...T.m,fontSize:9,color:C.dim,marginTop:6}}>{Math.round(pct)}% splněno</div>
+          </Card>
+        );
+      })()}
+
+      {/* Last workouts */}
+      {workouts.length>0&&(
+        <>
+          <SH c="Poslední tréninky"/>
+          {workouts.slice(-3).reverse().map(w=>(
+            <Card key={w.id} sx={{padding:"14px 16px",marginBottom:8}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <div style={{...T.m,fontSize:12,color:C.ivory}}>{w.dayName||"Volný trénink"}</div>
+                  <div style={{...T.m,fontSize:10,color:C.dim,marginTop:2}}>{fmtDate(w.date)} · {w.duration||0} min</div>
+                </div>
+                <div style={{...T.m,fontSize:10,color:C.dim}}>{(w.exercises||[]).length} cvičení</div>
+              </div>
+            </Card>
+          ))}
+        </>
+      )}
+
+      {workouts.length===0&&(
+        <Card sx={{padding:"24px",textAlign:"center",border:`1px dashed ${C.border}`}}>
+          <div style={{...T.t,fontSize:22,color:C.dim,marginBottom:8}}>Zatím žádné tréninky</div>
+          <div style={{...T.m,fontSize:11,color:C.dim,marginBottom:16}}>Začni dnes svůj první trénink!</div>
+          <Btn ch="Jdeme na to" onClick={()=>onGoTo("workout")}/>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+/* ── Workout Tab ────────────────────────────────────────────────── */
+function WorkoutTab({workouts,settings,onSave}){
+  const plan=PLANS.find(p=>p.id===settings.activePlan)||PLANS[0];
+  const dayIndex=workouts.filter(w=>w.planId===plan.id).length%plan.days.length;
+  const todayDay=plan.days[dayIndex];
+
+  const [session,setSession]=useState(null);
+  const [elapsed,setElapsed]=useState(0);
+  const [restTimer,setRestTimer]=useState(null);
+  const [saving,setSaving]=useState(false);
+  const timerRef=useRef(null);
+
+  useEffect(()=>{
+    if(session&&!timerRef.current){
+      timerRef.current=setInterval(()=>setElapsed(e=>e+1),1000);
+    }
+    if(!session&&timerRef.current){clearInterval(timerRef.current);timerRef.current=null;}
+    return()=>{if(timerRef.current){clearInterval(timerRef.current);timerRef.current=null;}};
+  },[!!session]);
+
+  const startSession=(day,free=false)=>{
+    setSession({
+      startTime:Date.now(),
+      free,
+      dayName:free?"Volný trénink":day.name,
+      exercises:day.exercises.map(ex=>({name:ex.name,targetSets:ex.sets,targetReps:ex.reps,rest:ex.rest||90,sets:[]})),
+      notes:"",
+    });
+    setElapsed(0);
+  };
+
+  const addSet=(exIdx)=>{
+    setSession(s=>{
+      const exs=[...s.exercises];
+      const ex={...exs[exIdx]};
+      const last=ex.sets[ex.sets.length-1];
+      ex.sets=[...ex.sets,{reps:last?last.reps:"",weight:last?last.weight:"",done:false}];
+      exs[exIdx]=ex;
+      return{...s,exercises:exs};
+    });
+  };
+
+  const updateSet=(exIdx,sIdx,field,val)=>{
+    setSession(s=>{
+      const exs=[...s.exercises];
+      const ex={...exs[exIdx]};
+      const sets=[...ex.sets];
+      sets[sIdx]={...sets[sIdx],[field]:val};
+      ex.sets=sets;exs[exIdx]=ex;
+      return{...s,exercises:exs};
+    });
+  };
+
+  const doneSet=(exIdx,sIdx)=>{
+    updateSet(exIdx,sIdx,"done",true);
+    const rest=session.exercises[exIdx].rest||90;
+    setRestTimer(rest);
+  };
+
+  const addExercise=()=>{
+    setSession(s=>({...s,exercises:[...s.exercises,{name:"Nové cvičení",targetSets:3,targetReps:"",rest:90,sets:[]}]}));
+  };
+
+  const updateExName=(exIdx,val)=>{
+    setSession(s=>{const exs=[...s.exercises];exs[exIdx]={...exs[exIdx],name:val};return{...s,exercises:exs};});
+  };
+
+  const finishSession=async()=>{
+    setSaving(true);
+    const dur=Math.round(elapsed/60);
+    const workout={id:uid(),date:today,planId:plan.id,dayName:session.dayName,exercises:session.exercises,duration:dur,notes:session.notes};
+    await onSave([...workouts,workout]);
+    setSession(null);setElapsed(0);setSaving(false);
+  };
+
+  const fmtTime=(s)=>{const m=Math.floor(s/60);return`${m}:${(s%60).toString().padStart(2,"0")}`;};
+
+  if(!session){
+    return(
+      <div style={{padding:"24px 20px 110px",animation:"fadeIn .3s ease"}}>
+        <SH c="Trénink" sub={`${plan.name} · Den ${dayIndex+1}/${plan.days.length}`}/>
+
+        <Card sx={{padding:"20px",marginBottom:20}}>
+          <div style={{...T.t,fontSize:22,fontWeight:500,color:C.ivory,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:16}}>{todayDay.name}</div>
+          {todayDay.exercises.map((ex,i)=>(
+            <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:`1px solid ${C.border}`}}>
+              <div>
+                <div style={{...T.m,fontSize:13,color:C.hi}}>{ex.name}</div>
+                <div style={{...T.m,fontSize:9,color:C.dim,marginTop:2}}>{ex.sets} série · {ex.reps} opak. · {ex.rest}s odpočinek</div>
+              </div>
+            </div>
+          ))}
+          <Btn ch="Začít trénink" onClick={()=>startSession(todayDay)} sx={{width:"100%",marginTop:18,padding:"14px"}}/>
+        </Card>
+
+        <div style={{textAlign:"center"}}>
+          <div style={{...T.m,fontSize:9,color:C.dim,marginBottom:10,letterSpacing:"0.1em"}}>nebo</div>
+          <Btn ch="Volný trénink" onClick={()=>startSession({exercises:[]},true)} v="g"/>
+        </div>
+      </div>
+    );
+  }
+
+  return(
+    <div style={{padding:"16px 20px 110px",animation:"fadeIn .3s ease"}}>
+      {restTimer&&<RestTimer seconds={restTimer} onDone={()=>setRestTimer(null)}/>}
+
+      {/* Timer bar */}
+      <div style={{background:C.s1,border:`1px solid ${C.mBorder}`,borderRadius:4,padding:"12px 18px",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{...T.m,fontSize:8,color:C.dim,letterSpacing:"0.14em",textTransform:"uppercase"}}>Probíhá trénink</div>
+          <div style={{...T.m,fontSize:10,color:C.hi,marginTop:1}}>{session.dayName}</div>
+        </div>
+        <div style={{...T.t,fontSize:34,color:C.ivory,letterSpacing:"0.06em",lineHeight:1}}>{fmtTime(elapsed)}</div>
+      </div>
+
+      {/* Exercises */}
+      {session.exercises.map((ex,exIdx)=>(
+        <Card key={exIdx} sx={{padding:"16px",marginBottom:12}}>
+          {session.free?(
+            <input value={ex.name} onChange={e=>updateExName(exIdx,e.target.value)}
+              style={{...T.t,fontSize:18,fontWeight:500,color:C.ivory,letterSpacing:"0.1em",textTransform:"uppercase",background:"transparent",border:"none",outline:"none",marginBottom:4,width:"100%"}}/>
+          ):(
+            <div style={{...T.t,fontSize:18,fontWeight:500,color:C.ivory,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>{ex.name}</div>
+          )}
+          {ex.targetReps&&<div style={{...T.m,fontSize:9,color:C.dim,marginBottom:12}}>Cíl: {ex.targetSets}×{ex.targetReps}</div>}
+
+          {/* Header */}
+          <div style={{display:"grid",gridTemplateColumns:"28px 1fr 1fr 40px",gap:6,marginBottom:6}}>
+            {["#","Opak.","kg","✓"].map(h=><div key={h} style={{...T.m,fontSize:8,color:C.dim,letterSpacing:"0.1em",textTransform:"uppercase",textAlign:"center"}}>{h}</div>)}
+          </div>
+
+          {ex.sets.map((set,sIdx)=>(
+            <div key={sIdx} style={{display:"grid",gridTemplateColumns:"28px 1fr 1fr 40px",gap:6,marginBottom:7,alignItems:"center",opacity:set.done?.5:1,transition:"opacity .2s"}}>
+              <div style={{...T.t,fontSize:16,color:C.dim,textAlign:"center"}}>{sIdx+1}</div>
+              <input type="number" value={set.reps} onChange={e=>updateSet(exIdx,sIdx,"reps",e.target.value)} placeholder="—" disabled={set.done}
+                style={{background:C.s2,border:`1px solid ${set.done?C.border:C.bHi}`,borderRadius:3,padding:"8px",color:C.ivory,...T.m,fontSize:14,textAlign:"center",width:"100%"}}/>
+              <input type="number" value={set.weight} onChange={e=>updateSet(exIdx,sIdx,"weight",e.target.value)} placeholder="—" disabled={set.done}
+                style={{background:C.s2,border:`1px solid ${set.done?C.border:C.bHi}`,borderRadius:3,padding:"8px",color:C.ivory,...T.m,fontSize:14,textAlign:"center",width:"100%"}}/>
+              <button onClick={()=>!set.done&&doneSet(exIdx,sIdx)}
+                style={{background:set.done?C.merlot:C.s2,border:`1px solid ${set.done?C.merlot:C.border}`,borderRadius:3,height:36,cursor:set.done?"default":"pointer",color:set.done?C.ivory:C.dim,fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",width:"100%",transition:"all .15s"}}>
+                {set.done?"✓":"○"}
+              </button>
+            </div>
+          ))}
+
+          <button onClick={()=>addSet(exIdx)}
+            style={{background:"transparent",border:`1px dashed ${C.bHi}`,borderRadius:3,padding:"7px",width:"100%",color:C.dim,...T.m,fontSize:9,letterSpacing:"0.12em",textTransform:"uppercase",cursor:"pointer",marginTop:4}}>
+            + Přidat sérii
+          </button>
+        </Card>
+      ))}
+
+      {session.free&&(
+        <button onClick={addExercise}
+          style={{background:"transparent",border:`1px dashed ${C.bHi}`,borderRadius:4,padding:"12px",width:"100%",color:C.dim,...T.m,fontSize:9,letterSpacing:"0.12em",textTransform:"uppercase",cursor:"pointer",marginBottom:14}}>
+          + Přidat cvičení
+        </button>
+      )}
+
+      {/* Notes */}
+      <Card sx={{padding:"14px 16px",marginBottom:14}}>
+        <Inp lbl="Poznámky k tréninku" val={session.notes} onChange={v=>setSession(s=>({...s,notes:v}))} ph="Jak šel trénink?" ml rows={2}/>
+      </Card>
+
+      <div style={{display:"flex",gap:10}}>
+        <Btn ch="Zahodit" onClick={()=>setSession(null)} v="d" sx={{flex:1}}/>
+        <Btn ch={saving?"Ukládám...":"Dokončit ✓"} onClick={finishSession} v="gr" sx={{flex:2}} dis={saving}/>
+      </div>
+    </div>
+  );
+}
+
+/* ── Plans Tab ──────────────────────────────────────────────────── */
+function PlansTab({settings,onActivate}){
+  const [open,setOpen]=useState(null);
+  const [activating,setActivating]=useState(false);
+
+  const doActivate=async(planId)=>{
+    setActivating(planId);
+    await onActivate(planId);
+    setActivating(false);
+  };
+
+  return(
+    <div style={{padding:"24px 20px 110px",animation:"fadeIn .3s ease"}}>
+      <SH c="Tréninkové plány"/>
+      {PLANS.map(plan=>{
+        const isActive=settings.activePlan===plan.id;
+        const isOpen=open===plan.id;
+        return(
+          <Card key={plan.id} sx={{marginBottom:12,border:`1px solid ${isActive?plan.color+"66":C.border}`,transition:"border-color .2s"}}>
+            <div style={{padding:"16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}} onClick={()=>setOpen(isOpen?null:plan.id)}>
+              <div>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
+                  <div style={{width:9,height:9,borderRadius:"50%",background:plan.color,boxShadow:`0 0 8px ${plan.color}88`}}/>
+                  <div style={{...T.t,fontSize:20,fontWeight:500,color:C.ivory,letterSpacing:"0.1em",textTransform:"uppercase"}}>{plan.name}</div>
+                  {isActive&&<div style={{...T.m,fontSize:8,color:plan.color,letterSpacing:"0.1em",textTransform:"uppercase",background:`${plan.color}18`,border:`1px solid ${plan.color}44`,borderRadius:3,padding:"2px 8px"}}>Aktivní</div>}
+                </div>
+                <div style={{...T.m,fontSize:10,color:C.dim}}>{plan.desc} · {plan.weeks} týdnů · {plan.days.length} dni/cyklus</div>
+              </div>
+              <div style={{color:C.dim,fontSize:14,transform:isOpen?"rotate(180deg)":"",transition:"transform .2s",paddingLeft:12}}>▾</div>
+            </div>
+
+            {isOpen&&(
+              <div style={{borderTop:`1px solid ${C.border}`,padding:"16px 16px 20px"}}>
+                {plan.days.map((day,i)=>(
+                  <div key={i} style={{marginBottom:16}}>
+                    <div style={{...T.t,fontSize:15,color:plan.color,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8,display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{...T.m,fontSize:9,color:C.dim}}>Den {i+1}</span>
+                      {day.name}
+                    </div>
+                    {day.exercises.map((ex,j)=>(
+                      <div key={j} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:`1px solid ${C.border}`}}>
+                        <div style={{...T.m,fontSize:12,color:C.hi}}>{ex.name}</div>
+                        <div style={{...T.m,fontSize:10,color:C.dim}}>{ex.sets}×{ex.reps}</div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+                {!isActive&&(
+                  <Btn ch={activating===plan.id?"Aktivuji...":"Aktivovat tento plán"} onClick={()=>doActivate(plan.id)} v="p" sx={{width:"100%",marginTop:4}} dis={!!activating}/>
+                )}
+              </div>
+            )}
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── Progress Tab ───────────────────────────────────────────────── */
+function ProgressTab({progress,onSave}){
+  const [form,setForm]=useState({date:today,weight:"",biceps:"",chest:"",waist:"",thighs:"",notes:""});
+  const [saving,setSaving]=useState(false);
+  const [activeChart,setActiveChart]=useState("weight");
+
+  const save=async()=>{
+    if(!form.weight&&!form.biceps&&!form.chest)return;
+    setSaving(true);
+    const entry={...form,id:uid()};
+    await onSave([...progress,entry]);
+    setForm({date:today,weight:"",biceps:"",chest:"",waist:"",thighs:"",notes:""});
+    setSaving(false);
+  };
+
+  const chartField=activeChart;
+  const chartLabel={weight:"Váha (kg)",biceps:"Biceps (cm)",chest:"Hrudník (cm)",waist:"Pas (cm)"};
+  const chartData=progress.slice(-14).map(p=>({date:p.date,v:parseFloat(p[chartField])||0})).filter(p=>p.v>0);
+
+  const minV=chartData.length?Math.min(...chartData.map(c=>c.v))-1:0;
+  const maxV=chartData.length?Math.max(...chartData.map(c=>c.v))+1:100;
+  const chartW=300,chartH=90;
+  const pts=chartData.map((p,i)=>{
+    const x=(i/Math.max(chartData.length-1,1))*(chartW-20)+10;
+    const y=chartH-((p.v-minV)/Math.max(maxV-minV,1))*chartH;
+    return`${x},${y}`;
+  });
+
+  return(
+    <div style={{padding:"24px 20px 110px",animation:"fadeIn .3s ease"}}>
+      <SH c="Měření a pokrok"/>
+
+      {/* Log form */}
+      <Card sx={{padding:"20px",marginBottom:20}}>
+        <Lbl c="Přidat měření"/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+          <Inp lbl="Datum" val={form.date} onChange={v=>setForm(s=>({...s,date:v}))} type="date"/>
+          <Inp lbl="Váha (kg)" val={form.weight} onChange={v=>setForm(s=>({...s,weight:v}))} ph="75.5" type="number"/>
+          <Inp lbl="Biceps (cm)" val={form.biceps} onChange={v=>setForm(s=>({...s,biceps:v}))} ph="35" type="number"/>
+          <Inp lbl="Hrudník (cm)" val={form.chest} onChange={v=>setForm(s=>({...s,chest:v}))} ph="100" type="number"/>
+          <Inp lbl="Pas (cm)" val={form.waist} onChange={v=>setForm(s=>({...s,waist:v}))} ph="80" type="number"/>
+          <Inp lbl="Stehna (cm)" val={form.thighs} onChange={v=>setForm(s=>({...s,thighs:v}))} ph="55" type="number"/>
+        </div>
+        <Inp lbl="Poznámka" val={form.notes} onChange={v=>setForm(s=>({...s,notes:v}))} ph="Jak se cítíš?" ml rows={2}/>
+        <Btn ch={saving?"Ukládám...":"Uložit měření"} onClick={save} dis={saving||(!form.weight&&!form.biceps)} sx={{width:"100%",marginTop:12}}/>
+      </Card>
+
+      {/* Chart */}
+      {progress.length>=2&&(
+        <Card sx={{padding:"18px 20px",marginBottom:20}}>
+          {/* Chart selector */}
+          <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
+            {Object.entries(chartLabel).map(([key,lbl])=>(
+              <button key={key} onClick={()=>setActiveChart(key)}
+                style={{...T.m,fontSize:8,letterSpacing:"0.12em",textTransform:"uppercase",padding:"5px 10px",borderRadius:3,cursor:"pointer",border:`1px solid ${activeChart===key?C.merlot:C.border}`,background:activeChart===key?C.mDark:"transparent",color:activeChart===key?C.ivory:C.dim,transition:"all .15s"}}>
+                {lbl}
+              </button>
+            ))}
+          </div>
+          {chartData.length>=2?(
+            <div style={{overflowX:"auto"}}>
+              <svg viewBox={`0 0 ${chartW} ${chartH+24}`} style={{width:"100%",minWidth:200,display:"block"}}>
+                {[0,0.5,1].map((t,i)=>{
+                  const y=chartH-t*chartH;
+                  const v=minV+t*(maxV-minV);
+                  return(
+                    <g key={i}>
+                      <line x1={10} y1={y} x2={chartW-10} y2={y} stroke={C.border} strokeWidth={0.5}/>
+                      <text x={chartW-4} y={y+4} fill={C.dim} fontSize={7} textAnchor="end">{Math.round(v)}</text>
+                    </g>
+                  );
+                })}
+                <polyline points={pts.join(" ")} fill="none" stroke={C.merlot} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round"/>
+                {chartData.map((p,i)=>{
+                  const[x,y]=pts[i].split(",").map(Number);
+                  return <circle key={i} cx={x} cy={y} r={3} fill={C.merlot}/>;
+                })}
+                {chartData.map((p,i)=>{
+                  const[x]=pts[i].split(",").map(Number);
+                  const d=p.date.slice(5);
+                  return <text key={i} x={x} y={chartH+20} fill={C.dim} fontSize={7} textAnchor="middle">{d}</text>;
+                })}
+              </svg>
+            </div>
+          ):<div style={{...T.m,fontSize:10,color:C.dim,textAlign:"center",padding:"20px 0"}}>Potřebuješ alespoň 2 záznamy pro graf</div>}
+        </Card>
+      )}
+
+      {/* History */}
+      {progress.length>0&&(
+        <>
+          <SH c="Historie" sub={`${progress.length} záznamů`}/>
+          {progress.slice(-6).reverse().map(p=>(
+            <Card key={p.id} sx={{padding:"14px 16px",marginBottom:8}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                <div style={{...T.m,fontSize:12,color:C.hi}}>{fmtDate(p.date)}</div>
+                {p.weight&&<div style={{...T.t,fontSize:22,color:C.ivory,lineHeight:1}}>{p.weight} <span style={{fontSize:14,color:C.dim}}>kg</span></div>}
+              </div>
+              <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
+                {p.biceps&&<div style={{...T.m,fontSize:9,color:C.dim}}>Biceps: <span style={{color:C.hi}}>{p.biceps} cm</span></div>}
+                {p.chest&&<div style={{...T.m,fontSize:9,color:C.dim}}>Hrudník: <span style={{color:C.hi}}>{p.chest} cm</span></div>}
+                {p.waist&&<div style={{...T.m,fontSize:9,color:C.dim}}>Pas: <span style={{color:C.hi}}>{p.waist} cm</span></div>}
+                {p.thighs&&<div style={{...T.m,fontSize:9,color:C.dim}}>Stehna: <span style={{color:C.hi}}>{p.thighs} cm</span></div>}
+              </div>
+              {p.notes&&<div style={{...T.m,fontSize:10,color:C.dim,marginTop:6,fontStyle:"italic",borderTop:`1px solid ${C.border}`,paddingTop:6}}>{p.notes}</div>}
+            </Card>
+          ))}
+        </>
+      )}
+
+      {progress.length===0&&(
+        <Card sx={{padding:"24px",textAlign:"center",border:`1px dashed ${C.border}`}}>
+          <div style={{...T.t,fontSize:20,color:C.dim,marginBottom:8}}>Žádná měření</div>
+          <div style={{...T.m,fontSize:11,color:C.dim}}>Přidej první měření výše</div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+/* ── Nutrition Tab ──────────────────────────────────────────────── */
+function NutritionTab({nutrition,settings,onSave}){
+  const goalCal=parseInt(settings.calGoal)||2500;
+  const todayNut=nutrition.find(n=>n.date===today)||{date:today,meals:[],goalCal};
+  const [form,setForm]=useState({name:"",cal:"",protein:"",carbs:"",fat:""});
+  const [saving,setSaving]=useState(false);
+
+  const totCal=todayNut.meals.reduce((s,m)=>s+(parseInt(m.cal)||0),0);
+  const totProt=todayNut.meals.reduce((s,m)=>s+(parseInt(m.protein)||0),0);
+  const totCarbs=todayNut.meals.reduce((s,m)=>s+(parseInt(m.carbs)||0),0);
+  const totFat=todayNut.meals.reduce((s,m)=>s+(parseInt(m.fat)||0),0);
+  const calPct=(totCal/goalCal)*100;
+
+  const addMeal=async()=>{
+    if(!form.name||!form.cal)return;
+    setSaving(true);
+    const meal={id:uid(),...form};
+    const updToday={...todayNut,meals:[...todayNut.meals,meal]};
+    const updNut=[...nutrition.filter(n=>n.date!==today),updToday];
+    await onSave(updNut);
+    setForm({name:"",cal:"",protein:"",carbs:"",fat:""});
+    setSaving(false);
+  };
+
+  const removeMeal=async(mealId)=>{
+    const updToday={...todayNut,meals:todayNut.meals.filter(m=>m.id!==mealId)};
+    await onSave([...nutrition.filter(n=>n.date!==today),updToday]);
+  };
+
+  const tips=[
+    "Sněz 1,6–2,2 g bílkovin na kg váhy pro maximální růst svalů.",
+    "Pij 2–3 litry vody denně. Hydratace = výkon.",
+    "Po tréninku sněz bílkoviny + sacharidy do 2 hodin.",
+    "Komplexní sacharidy (rýže, ovesné vločky) = stabilní energie.",
+    "Zdravé tuky z ořechů a avokáda podporují testosteron.",
+    "Kalorickýsurplus ~200–300 kcal = optimální nabírání.",
+    "Jez dostatečně — svaly rostou jen když máš dostatek energie.",
+  ];
+  const tip=tips[new Date().getDay()%tips.length];
+
+  return(
+    <div style={{padding:"24px 20px 110px",animation:"fadeIn .3s ease"}}>
+      <SH c="Výživa"/>
+
+      {/* Calorie summary */}
+      <Card sx={{padding:"20px",marginBottom:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <Lbl c="Kalorie dnes" s={{marginBottom:0}}/>
+          <div style={{...T.m,fontSize:9,color:C.dim}}>Cíl: {goalCal} kcal</div>
+        </div>
+        <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:12}}>
+          <div style={{...T.t,fontSize:40,fontWeight:500,color:calPct>=100?C.green:C.ivory,lineHeight:1}}>{totCal}</div>
+          <div style={{...T.m,fontSize:12,color:C.dim}}>kcal</div>
+          <div style={{flex:1}}/>
+          {goalCal-totCal>0&&<div style={{...T.m,fontSize:10,color:C.dim}}>{goalCal-totCal} zbývá</div>}
+        </div>
+        <Bar pct={calPct} color={calPct>=100?C.green:C.merlot} h={8}/>
+
+        {/* Macros */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginTop:16}}>
+          {[{l:"Bílkoviny",v:totProt,u:"g",c:"#4a90d0"},{l:"Sacharidy",v:totCarbs,u:"g",c:"#e8b84b"},{l:"Tuky",v:totFat,u:"g",c:"#e07840"}].map(m=>(
+            <div key={m.l} style={{textAlign:"center"}}>
+              <div style={{...T.t,fontSize:22,color:m.c,lineHeight:1}}>{m.v}<span style={{fontSize:13}}>{m.u}</span></div>
+              <div style={{...T.m,fontSize:8,color:C.dim,letterSpacing:"0.1em",textTransform:"uppercase",marginTop:3}}>{m.l}</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* Add meal */}
+      <Card sx={{padding:"20px",marginBottom:20}}>
+        <Lbl c="Přidat jídlo"/>
+        <Inp lbl="" val={form.name} onChange={v=>setForm(s=>({...s,name:v}))} ph="Název jídla (např. Kuřecí prsa + rýže)" sx={{marginBottom:10}}/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+          <Inp lbl="Kalorie (kcal)" val={form.cal} onChange={v=>setForm(s=>({...s,cal:v}))} ph="400" type="number"/>
+          <Inp lbl="Bílkoviny (g)" val={form.protein} onChange={v=>setForm(s=>({...s,protein:v}))} ph="35" type="number"/>
+          <Inp lbl="Sacharidy (g)" val={form.carbs} onChange={v=>setForm(s=>({...s,carbs:v}))} ph="50" type="number"/>
+          <Inp lbl="Tuky (g)" val={form.fat} onChange={v=>setForm(s=>({...s,fat:v}))} ph="12" type="number"/>
+        </div>
+        <Btn ch={saving?"Přidávám...":"Přidat jídlo +"} onClick={addMeal} dis={saving||!form.name||!form.cal} sx={{width:"100%"}}/>
+      </Card>
+
+      {/* Today's meals */}
+      {todayNut.meals.length>0&&(
+        <>
+          <SH c="Dnešní jídla"/>
+          {todayNut.meals.map(m=>(
+            <Card key={m.id} sx={{padding:"12px 14px",marginBottom:8}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div style={{...T.m,fontSize:12,color:C.hi,flex:1,paddingRight:10}}>{m.name}</div>
+                <div style={{display:"flex",alignItems:"center",gap:12}}>
+                  <div style={{...T.t,fontSize:20,color:C.ivory}}>{m.cal}<span style={{fontSize:11,color:C.dim}}> kcal</span></div>
+                  <button onClick={()=>removeMeal(m.id)} style={{background:"transparent",border:"none",color:C.dim,cursor:"pointer",fontSize:14,padding:"2px 4px",lineHeight:1}}>×</button>
+                </div>
+              </div>
+              {(m.protein||m.carbs||m.fat)&&(
+                <div style={{display:"flex",gap:12,marginTop:5}}>
+                  {m.protein&&<div style={{...T.m,fontSize:9,color:"#4a90d0"}}>B: {m.protein}g</div>}
+                  {m.carbs&&<div style={{...T.m,fontSize:9,color:"#e8b84b"}}>S: {m.carbs}g</div>}
+                  {m.fat&&<div style={{...T.m,fontSize:9,color:"#e07840"}}>T: {m.fat}g</div>}
+                </div>
+              )}
+            </Card>
+          ))}
+        </>
+      )}
+
+      {/* Tip */}
+      <Card sx={{padding:"14px 18px",marginTop:8,borderLeft:`3px solid ${C.blue}`}}>
+        <div style={{...T.m,fontSize:8,color:C.blue,letterSpacing:"0.14em",textTransform:"uppercase",marginBottom:6}}>Tip dne</div>
+        <div style={{...T.m,fontSize:12,color:C.hi,lineHeight:1.6}}>{tip}</div>
+      </Card>
+    </div>
+  );
+}
+
+/* ── Settings Tab ───────────────────────────────────────────────── */
+function SettingsTab({settings,onSave}){
+  const [form,setForm]=useState({...DEF_SETTINGS,...settings});
+  const [saving,setSaving]=useState(false);
+  const [saved,setSaved]=useState(false);
+
+  const save=async()=>{
+    setSaving(true);
+    await onSave(form);
+    setSaving(false);setSaved(true);
+    setTimeout(()=>setSaved(false),2000);
+  };
+
+  return(
+    <div style={{padding:"24px 20px 110px",animation:"fadeIn .3s ease"}}>
+      <SH c="Nastavení"/>
+      <Card sx={{padding:"20px",marginBottom:14}}>
+        <Lbl c="Profil"/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <div style={{gridColumn:"1/-1"}}><Inp lbl="Jméno" val={form.name} onChange={v=>setForm(s=>({...s,name:v}))} ph="Tvoje jméno"/></div>
+          <Inp lbl="Startovní váha (kg)" val={form.startWeight} onChange={v=>setForm(s=>({...s,startWeight:v}))} ph="80" type="number"/>
+          <Inp lbl="Cílová váha (kg)" val={form.goalWeight} onChange={v=>setForm(s=>({...s,goalWeight:v}))} ph="75" type="number"/>
+          <div style={{gridColumn:"1/-1"}}><Inp lbl="Denní kalorický cíl (kcal)" val={form.calGoal} onChange={v=>setForm(s=>({...s,calGoal:v}))} ph="2500" type="number"/></div>
+        </div>
+        <Btn ch={saving?"Ukládám...":(saved?"✓ Uloženo":"Uložit nastavení")} onClick={save} dis={saving} sx={{width:"100%",marginTop:14,background:saved?C.green:undefined}}/>
+      </Card>
+
+      <Card sx={{padding:"16px 18px",marginBottom:14}}>
+        <Lbl c="Aktivní plán"/>
+        <Inp lbl="" val={form.activePlan} onChange={v=>setForm(s=>({...s,activePlan:v}))}
+          opts={PLANS.map(p=>({v:p.id,l:`${p.name} — ${p.desc}`}))}/>
+      </Card>
+
+      <Card sx={{padding:"16px 18px"}}>
+        <Lbl c="Účet"/>
+        <Btn ch="Odhlásit se" onClick={()=>{localStorage.removeItem("liberti_fit_auth");window.location.reload();}} v="d"/>
+      </Card>
+    </div>
+  );
+}
+
+/* ── Bottom Navigation ──────────────────────────────────────────── */
+function BottomNav({active,onSelect}){
+  const tabs=[
+    {id:"home",label:"Dnes",icon:"⌂"},
+    {id:"workout",label:"Trénink",icon:"◈"},
+    {id:"plans",label:"Plány",icon:"≡"},
+    {id:"progress",label:"Pokrok",icon:"↗"},
+    {id:"nutrition",label:"Výživa",icon:"◉"},
+  ];
+  return(
+    <nav style={{position:"fixed",bottom:0,left:0,right:0,background:C.s1,borderTop:`1px solid ${C.border}`,zIndex:200,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
+      <div style={{display:"flex"}}>
+        {tabs.map(t=>{
+          const isA=active===t.id;
+          return(
+            <button key={t.id} onClick={()=>onSelect(t.id)}
+              style={{flex:1,padding:"10px 4px 8px",background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,touchAction:"manipulation",WebkitTapHighlightColor:"transparent",position:"relative"}}>
+              {isA&&<div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:24,height:2,background:C.merlot,borderRadius:1}}/>}
+              <span style={{fontSize:18,color:isA?C.merlot:C.dim,transition:"color .15s"}}>{t.icon}</span>
+              <span style={{...T.m,fontSize:7.5,letterSpacing:"0.1em",textTransform:"uppercase",color:isA?C.merlot:C.dim,fontWeight:isA?600:400,transition:"color .15s"}}>{t.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+/* ── App ────────────────────────────────────────────────────────── */
+function App(){
+  const [authed,setAuthed]=useState(false);
+  const [tab,setTab]=useState("home");
+  const [loading,setLoading]=useState(true);
+  const [syncing,setSyncing]=useState(false);
+  const [syncErr,setSyncErr]=useState(null);
+  const [toast,setToast]=useState(null);
+  const [workouts,setWorkouts]=useState([]);
+  const [progress,setProgress]=useState([]);
+  const [nutrition,setNutrition]=useState([]);
+  const [settings,setSettings]=useState(DEF_SETTINGS);
+  const {confirm,Modal}=useConfirm();
+
+  const showToast=(msg,dur=2500)=>{setToast(msg);setTimeout(()=>setToast(null),dur);};
+
+  const loadAll=async()=>{
+    setLoading(true);setSyncErr(null);
+    try{
+      const w=await apiRead("workouts");
+      const pr=await apiRead("progress");
+      const n=await apiRead("nutrition");
+      const s=await apiRead("settings");
+      setWorkouts(Array.isArray(w)?w:[]);
+      setProgress(Array.isArray(pr)?pr:[]);
+      setNutrition(Array.isArray(n)?n:[]);
+      if(s&&typeof s==="object"&&!Array.isArray(s)&&s.name)setSettings({...DEF_SETTINGS,...s});
+    }catch(e){
+      setSyncErr("Nepodařilo se načíst data.");
+    }
+    setLoading(false);
+  };
+
+  useEffect(()=>{if(authed)loadAll();},[authed]);
+
+  const saveWorkouts=async(data)=>{setSyncing(true);try{await apiWrite("workouts",data);setWorkouts(data);showToast("✓ Trénink uložen");}catch(e){showToast("⚠ Chyba ukládání");}setSyncing(false);};
+  const saveProgress=async(data)=>{setSyncing(true);try{await apiWrite("progress",data);setProgress(data);showToast("✓ Měření uloženo");}catch(e){showToast("⚠ Chyba ukládání");}setSyncing(false);};
+  const saveNutrition=async(data)=>{setSyncing(true);try{await apiWrite("nutrition",data);setNutrition(data);}catch(e){showToast("⚠ Chyba ukládání");}setSyncing(false);};
+  const saveSettings=async(data)=>{setSyncing(true);try{await apiWrite("settings",data);setSettings(data);showToast("✓ Nastavení uloženo");}catch(e){showToast("⚠ Chyba ukládání");}setSyncing(false);};
+  const activatePlan=async(planId)=>{const ns={...settings,activePlan:planId};await saveSettings(ns);showToast("✓ Plán aktivován");};
+
+  if(!authed)return <PinLogin onSuccess={()=>setAuthed(true)}/>;
+
+  return(
+    <div style={{minHeight:"100vh",background:C.bg}}>
+      {Modal}
+
+      {/* Header */}
+      <header style={{borderBottom:`1px solid ${C.border}`,padding:"0 20px",height:50,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0,position:"sticky",top:0,background:C.bg,zIndex:100}}>
+        <div style={{display:"flex",alignItems:"center",gap:0}}>
+          <div style={{...T.t,fontWeight:300,fontSize:22,letterSpacing:"0.26em",color:C.ivory,textIndent:"0.26em"}}>LIBERTI</div>
+          <div style={{borderLeft:`1px solid ${C.border}`,marginLeft:14,paddingLeft:14}}>
+            <div style={{...T.m,fontSize:7.5,letterSpacing:"0.36em",textTransform:"uppercase",color:C.merlot}}>FITNESS</div>
+          </div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          {syncing&&<Spin sz={13}/>}
+          {toast&&!syncing&&<span style={{...T.m,fontSize:9,letterSpacing:"0.1em",color:toast.startsWith("⚠")?"#e06060":C.green,animation:"fadeIn .2s ease"}}>{toast}</span>}
+          {syncErr&&<span style={{...T.m,fontSize:9,color:"#e06060"}}>{syncErr}</span>}
+          <button onClick={loadAll} style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:3,padding:"5px 10px",color:C.dim,...T.m,fontSize:8.5,letterSpacing:"0.1em",cursor:"pointer",textTransform:"uppercase"}}>Sync</button>
+          <button onClick={()=>setTab("settings")} style={{background:tab==="settings"?C.s2:"transparent",border:`1px solid ${tab==="settings"?C.merlot:C.border}`,borderRadius:3,padding:"5px 10px",color:tab==="settings"?C.ivory:C.dim,...T.m,fontSize:8.5,letterSpacing:"0.1em",cursor:"pointer",textTransform:"uppercase"}}>⚙</button>
+        </div>
+      </header>
+
+      {/* Content */}
+      {loading?(
+        <div style={{display:"flex",justifyContent:"center",alignItems:"center",height:"65vh"}}>
+          <div style={{textAlign:"center"}}>
+            <Spin sz={32}/>
+            <div style={{...T.m,fontSize:10,color:C.dim,marginTop:18,letterSpacing:"0.14em",textTransform:"uppercase"}}>Načítám data...</div>
+          </div>
+        </div>
+      ):(
+        <div>
+          {tab==="home"&&<HomeTab workouts={workouts} progress={progress} settings={settings} onGoTo={setTab}/>}
+          {tab==="workout"&&<WorkoutTab workouts={workouts} settings={settings} onSave={saveWorkouts}/>}
+          {tab==="plans"&&<PlansTab settings={settings} onActivate={activatePlan}/>}
+          {tab==="progress"&&<ProgressTab progress={progress} onSave={saveProgress}/>}
+          {tab==="nutrition"&&<NutritionTab nutrition={nutrition} settings={settings} onSave={saveNutrition}/>}
+          {tab==="settings"&&<SettingsTab settings={settings} onSave={saveSettings}/>}
+        </div>
+      )}
+
+      {tab!=="settings"&&<BottomNav active={tab} onSelect={setTab}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
